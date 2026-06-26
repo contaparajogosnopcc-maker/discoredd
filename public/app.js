@@ -1,206 +1,110 @@
-// ============================================================
-// Discord Rich Presence - Render Edition
-// WebSocket real + Fallback para polling
-// ============================================================
+let user = null, token = null, ws = null, selectedUserId = null;
 
-let user = null;
-let token = null;
-let ws = null;
-let start = null;
-let timer = null;
-let reconnectTimer = null;
-
-const API = ''; // Mesmo servidor
-
-// ============================================================
-// TOKEN
-// ============================================================
 function getToken() {
   if (token) return token;
-  const p = new URLSearchParams(location.search);
-  const t = p.get('token');
+  const p = new URLSearchParams(location.search), t = p.get('token');
   if (t) { token = t; localStorage.setItem('dt', t); history.replaceState({}, document.title, location.pathname); return t; }
-  const s = localStorage.getItem('dt');
-  if (s) { token = s; return s; }
+  const s = localStorage.getItem('dt'); if (s) { token = s; return s; }
   return null;
 }
 
 async function api(path, opts = {}) {
-  const t = getToken();
-  const h = { ...opts.headers };
+  const t = getToken(), h = { ...opts.headers };
   if (t) h['Authorization'] = 'Bearer ' + t;
-  if (opts.body) h['Content-Type'] = 'application/json';
-  return fetch(API + path, { ...opts, headers: h });
+  if (opts.body && typeof opts.body === 'string') h['Content-Type'] = 'application/json';
+  return fetch(path, { ...opts, headers: h });
 }
 
-// ============================================================
-// WEBSOCKET
-// ============================================================
 function connectWS() {
-  if (ws) { ws.close(); ws = null; }
-
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}`);
-
-  ws.onopen = () => {
-    console.log('✅ WebSocket conectado');
-    document.getElementById('statusText').textContent = 'Conectado (WS)';
-    document.getElementById('status').className = 'status';
-  };
-
+  ws.onopen = () => { document.getElementById('statusBar').className = 'status'; document.getElementById('statusText').textContent = 'Conectado'; };
   ws.onmessage = (e) => {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'presences') {
-        renderOnline(msg.data);
-      }
-    } catch {}
+    const m = JSON.parse(e.data);
+    if (m.type === 'presences') renderOnline(m.data);
+    if (m.type === 'chat') addMessage(m.message);
+    if (m.type === 'chat_history') { document.getElementById('chatMessages').innerHTML = ''; m.messages.forEach(addMessage); }
+    if (m.type === 'chat_clear') { document.getElementById('chatMessages').innerHTML = '<div class="system-msg">🧹 Chat limpo pelo Admin</div>'; }
+    if (m.type === 'user_kicked') { addSystemMsg('👢 Admin removeu um usuário'); }
+    if (m.type === 'user_banned') { addSystemMsg('🔨 Admin baniu um usuário'); }
   };
-
-  ws.onclose = () => {
-    console.log('❌ WebSocket fechado');
-    document.getElementById('statusText').textContent = 'Reconectando...';
-    document.getElementById('status').className = 'status reconnecting';
-    // Reconectar em 3 segundos
-    reconnectTimer = setTimeout(connectWS, 3000);
-  };
-
-  ws.onerror = () => {
-    console.log('⚠️ Erro WebSocket, usando polling');
-    document.getElementById('statusText').textContent = 'Online (polling)';
-  };
+  ws.onclose = () => { document.getElementById('statusBar').className = 'status disconnected'; setTimeout(connectWS, 3000); };
 }
 
-// ============================================================
-// INICIALIZAÇÃO
-// ============================================================
 async function init() {
   connectWS();
-
   const t = getToken();
-  if (t) {
-    try {
-      const r = await api('/api/user');
-      if (r.ok) { user = await r.json(); dash(); return; }
-    } catch(e) {}
-    localStorage.removeItem('dt'); token = null;
-  }
+  if (t) { try { const r = await api('/api/user'); if (r.ok) { user = await r.json(); dash(); return; } } catch(e) {} localStorage.removeItem('dt'); token = null; }
   login();
 }
 
-function login() {
-  document.getElementById('loginBox').classList.remove('hidden');
-  document.getElementById('dash').classList.add('hidden');
-}
+function login() { document.getElementById('loginBox').classList.remove('hidden'); document.getElementById('dash').classList.add('hidden'); }
 
 function dash() {
-  document.getElementById('loginBox').classList.add('hidden');
-  document.getElementById('dash').classList.remove('hidden');
-
-  const av = user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : 'https://cdn.discordapp.com/embed/avatars/0.png';
+  document.getElementById('loginBox').classList.add('hidden'); document.getElementById('dash').classList.remove('hidden');
+  const av = user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64` : 'https://cdn.discordapp.com/embed/avatars/0.png';
   document.getElementById('avatar').src = av;
-  document.getElementById('prevAvatar').src = av;
-  const name = user.global_name || user.username;
-  document.getElementById('username').textContent = name;
-  document.getElementById('prevName').textContent = name;
-  
+  document.getElementById('username').textContent = user.global_name || user.username;
   const tag = document.getElementById('tag');
-  if (user.discriminator && user.discriminator !== '0') {
-    tag.textContent = '#' + user.discriminator;
-    tag.style.display = '';
-  } else {
-    tag.style.display = 'none';
-  }
-
-  document.getElementById('detailsInput').value = 'Explorando o site demo';
-  document.getElementById('stateInput').value = 'Testando Rich Presence';
-  updatePreview();
-  
-  document.getElementById('updateBtn').onclick = update;
+  if (user.discriminator && user.discriminator !== '0') { tag.textContent = '#' + user.discriminator; tag.style.display = ''; } else tag.style.display = 'none';
+  if (user.isAdmin) document.getElementById('adminPanel').classList.remove('hidden');
+  document.getElementById('sendBtn').onclick = sendMsg;
+  document.getElementById('chatInput').onkeydown = e => { if (e.key === 'Enter') sendMsg(); };
   document.getElementById('logoutBtn').onclick = logout;
-  
-  start = Date.now();
-  timer = setInterval(() => {
-    const e = Math.floor((Date.now() - start) / 1000);
-    document.getElementById('prevTime').textContent = `⏱️ ${Math.floor(e/60)} min ${e%60}s ativo`;
-  }, 1000);
-  
-  setTimeout(update, 500);
+  document.getElementById('modalClose').onclick = closeModal;
+  document.getElementById('modalKick').onclick = () => adminAction('kick');
+  document.getElementById('modalBan').onclick = () => adminAction('ban');
+  api('/api/presence', { method: 'POST', body: JSON.stringify({ details: 'No chat', state: 'Conversando' }) }).catch(()=>{});
 }
 
-// ============================================================
-// ATUALIZAR PRESENÇA
-// ============================================================
-async function update() {
-  const d = document.getElementById('detailsInput').value || 'Explorando o site demo';
-  const s = document.getElementById('stateInput').value || 'Testando Rich Presence';
-  msg('Atualizando...');
-  try {
-    const r = await api('/api/presence', { method: 'POST', body: JSON.stringify({ details: d, state: s }) });
-    if (r.ok) { msg('✅ Atualizado!'); updatePreview(); start = Date.now(); setTimeout(() => msg(''), 2500); }
-    else msg('❌ Erro', true);
-  } catch(e) { msg('❌ Conexão', true); }
+async function sendMsg() {
+  const input = document.getElementById('chatInput'), text = input.value.trim();
+  if (!text) return; input.value = ''; input.focus();
+  try { await api('/api/messages', { method: 'POST', body: JSON.stringify({ text }) }); } catch(e) {}
 }
 
-function updatePreview() {
-  document.getElementById('prevDetails').textContent = document.getElementById('detailsInput').value;
-  document.getElementById('prevState').textContent = document.getElementById('stateInput').value;
+function addMessage(m) {
+  const c = document.getElementById('chatMessages'), isMine = user && m.userId === user.id;
+  const av = m.avatar ? `https://cdn.discordapp.com/avatars/${m.userId}/${m.avatar}.png?size=32` : 'https://cdn.discordapp.com/embed/avatars/0.png';
+  const time = new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+  div.className = `msg ${isMine ? 'mine' : 'other'} ${m.isAdmin ? 'admin-msg' : ''}`;
+  div.innerHTML = `<div class="msg-header"><img src="${av}" class="msg-avatar"><span class="msg-name">${m.username}</span>${m.isAdmin ? '<span class="msg-admin-badge">ADMIN</span>' : ''}<span class="msg-time">${time}</span></div><div class="msg-text">${escapeHtml(m.text)}</div>`;
+  c.appendChild(div); c.scrollTop = c.scrollHeight;
 }
 
-// ============================================================
-// RENDER ONLINE
-// ============================================================
+function addSystemMsg(t) { const c = document.getElementById('chatMessages'), d = document.createElement('div'); d.className = 'system-msg'; d.textContent = t; c.appendChild(d); c.scrollTop = c.scrollHeight; }
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
 function renderOnline(list) {
-  const c = document.getElementById('onlineList');
-  const cnt = document.getElementById('onlineCount');
-  
-  if (!list?.length) {
-    c.innerHTML = '<div class="loading">Nenhum usuário online</div>';
-    if(cnt) cnt.textContent = '';
-    return;
-  }
-  
+  const c = document.getElementById('onlineList'), cnt = document.getElementById('onlineCount');
+  if (!list?.length) { c.innerHTML = '<div class="loading">Ninguém online</div>'; if(cnt) cnt.textContent = ''; return; }
   c.innerHTML = list.map(p => {
-    const av = p.avatar ? `https://cdn.discordapp.com/avatars/${p.userId}/${p.avatar}.png?size=64` : 'https://cdn.discordapp.com/embed/avatars/0.png';
-    const me = user?.id === p.userId;
-    return `<div class="online-card"><img src="${av}" class="online-av"><div class="online-info"><div class="online-name">${p.globalName||p.username} ${me?'<span style="color:#6366F1">(você)</span>':''}</div><div class="online-det">${p.presence.details} · ${ago(p.lastUpdate)}</div></div><div class="online-dot"></div></div>`;
+    const av = p.avatar ? `https://cdn.discordapp.com/avatars/${p.userId}/${p.avatar}.png?size=32` : 'https://cdn.discordapp.com/embed/avatars/0.png';
+    const isMe = user?.id === p.userId, adminClick = user?.isAdmin && !isMe;
+    return `<div class="online-item ${adminClick ? 'admin-clickable' : ''}" data-userid="${p.userId}" data-username="${p.globalName||p.username}" ${adminClick ? `onclick="openAdminModal('${p.userId}','${p.globalName||p.username}')"` : ''}>
+      <img src="${av}" class="online-av"><span class="online-name">${p.globalName||p.username} ${isMe?'(você)':''} ${p.isAdmin?'<span class="admin-badge-sidebar">ADMIN</span>':''}</span><span class="online-dot"></span></div>`;
   }).join('');
-  
   if(cnt) cnt.textContent = `${list.length} online`;
 }
 
-function ago(ts) {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 10) return 'agora';
-  if (s < 60) return `há ${s}s`;
-  if (s < 3600) return `há ${Math.floor(s/60)}min`;
-  return `há ${Math.floor(s/3600)}h`;
+function openAdminModal(uid, uname) { selectedUserId = uid; document.getElementById('modalUsername').textContent = uname; document.getElementById('adminModal').classList.remove('hidden'); }
+function closeModal() { document.getElementById('adminModal').classList.add('hidden'); selectedUserId = null; }
+
+async function adminAction(action) {
+  if (!selectedUserId) return;
+  const ep = action === 'kick' ? `/api/admin/user/${selectedUserId}` : `/api/admin/ban/${selectedUserId}`;
+  const method = action === 'kick' ? 'DELETE' : 'POST';
+  try { await api(ep, { method }); } catch(e) {}
+  closeModal();
 }
 
-// ============================================================
-// LOGOUT
-// ============================================================
+async function adminClearChat() { if (confirm('Limpar todo o chat?')) { try { await api('/api/admin/chat/clear', { method: 'DELETE' }); } catch(e) {} } }
+
 async function logout() {
   await api('/api/presence', { method: 'DELETE' }).catch(()=>{});
-  clearInterval(timer);
-  if (reconnectTimer) clearTimeout(reconnectTimer);
   if (ws) ws.close();
-  localStorage.removeItem('dt');
-  token = null; user = null;
-  login();
+  localStorage.removeItem('dt'); token = null; user = null; login();
 }
 
-// ============================================================
-// MENSAGEM
-// ============================================================
-function msg(m, e) {
-  const el = document.getElementById('msg');
-  el.textContent = m;
-  el.className = 'msg' + (m ? ' show' : '') + (e ? ' err' : '');
-}
-
-// ============================================================
-// INICIAR
-// ============================================================
-console.log('🎮 Discord Rich Presence - Render Edition');
 init();

@@ -3,73 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Discord Rich Presence</title>
+  <title>Discord Chat - Admin</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <span class="badge">☁️ Render</span>
-      <h1>🎮 Discord Rich Presence</h1>
-      <p class="sub">Conecte seu Discord e veja atividades em tempo real via WebSocket</p>
+      <span class="badge">🛡️ Admin</span>
+      <h1>💬 Discord Chat</h1>
+      <p class="sub">Bate-papo em tempo real • Comandos Admin</p>
     </header>
 
-    <!-- Login -->
     <div id="loginBox" class="card">
-      <div class="logo">🎮</div>
+      <div class="logo">🛡️</div>
       <h2>Conecte sua conta Discord</h2>
-      <p>Ative o <strong>Rich Presence</strong> e compartilhe suas atividades!</p>
-      <div class="feats">
-        <div class="feat">🔐 Login seguro OAuth2</div>
-        <div class="feat">⚡ WebSocket em tempo real</div>
-        <div class="feat">🟢 Veja quem está online</div>
-      </div>
+      <p>Entre para conversar em <strong>tempo real</strong>!</p>
       <a href="/login" class="btn">Login com Discord</a>
     </div>
 
-    <!-- Dashboard -->
-    <div id="dash" class="card hidden">
-      <div class="user-row">
-        <img id="avatar" src="" class="avatar">
-        <div class="user-col">
-          <strong id="username"></strong>
-          <span id="tag" class="tag"></span>
+    <div id="dash" class="main-layout hidden">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <img id="avatar" src="" class="avatar">
+          <div><strong id="username"></strong><span id="tag" class="tag"></span></div>
+          <button id="logoutBtn" class="btn-out">🚪</button>
         </div>
-        <button id="logoutBtn" class="btn-out">Sair</button>
-      </div>
-
-      <h3>⚡ Seu Rich Presence</h3>
-      <div class="preview">
-        <div class="prev-row">
-          <img id="prevAvatar" src="" class="prev-avatar">
-          <div>
-            <strong id="prevName"></strong>
-            <span class="prev-sub">está utilizando</span>
-          </div>
+        <div id="adminPanel" class="admin-panel hidden">
+          <h4>🛡️ Painel Admin</h4>
+          <button class="admin-btn danger" onclick="adminClearChat()">🧹 Limpar Chat</button>
+          <div class="admin-info">Clique em um usuário para gerenciar</div>
         </div>
-        <p id="prevDetails" class="prev-title">Carregando...</p>
-        <p id="prevState" class="prev-state"></p>
-        <p id="prevTime" class="prev-time"></p>
-      </div>
+        <h4>🟢 Online</h4>
+        <div id="onlineList" class="online-list"><div class="loading">Carregando...</div></div>
+        <div id="onlineCount" class="count"></div>
+      </aside>
 
-      <h4>🎨 Personalizar</h4>
-      <div class="field">
-        <label>Título</label>
-        <input id="detailsInput" placeholder="Ex: Explorando o dashboard" maxlength="128">
-      </div>
-      <div class="field">
-        <label>Descrição</label>
-        <input id="stateInput" placeholder="Ex: Testando Rich Presence" maxlength="128">
-      </div>
-      <button id="updateBtn" class="btn full">Atualizar Agora</button>
-      <div id="msg" class="msg"></div>
-
-      <h3>🟢 Usuários Ativos</h3>
-      <div id="onlineList" class="online"><div class="loading">Carregando...</div></div>
-      <div id="onlineCount" class="count"></div>
+      <main class="chat-area">
+        <div class="chat-header"><h3>💬 Chat ao Vivo</h3></div>
+        <div id="chatMessages" class="chat-messages"><div class="chat-loading">Carregando...</div></div>
+        <div class="chat-input-area">
+          <input id="chatInput" type="text" placeholder="Digite sua mensagem..." maxlength="500">
+          <button id="sendBtn" class="btn">Enviar</button>
+        </div>
+      </main>
     </div>
 
-    <div id="status" class="status"><span class="dot"></span> <span id="statusText">Conectado</span></div>
+    <div id="adminModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>🛡️ Gerenciar Usuário</h3>
+        <p id="modalUsername"></p>
+        <div class="modal-buttons">
+          <button class="admin-btn warning" id="modalKick">👢 Kick</button>
+          <button class="admin-btn danger" id="modalBan">🔨 Banir</button>
+          <button class="btn" id="modalClose">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="statusBar" class="status"><span class="dot"></span> <span id="statusText">Conectado</span></div>
   </div>
   <script src="app.js"></script>
 </body>
