@@ -1,5 +1,5 @@
 // ============================================================
-// Discord Site - Chat + Admin + Call
+// Discord Site - Chat + Admin + Call (Áudio prioritário)
 // ============================================================
 
 let user = null, token = null, ws = null, selectedUserId = null;
@@ -38,7 +38,6 @@ if (m.type === 'chat_history') { document.getElementById('chatMessages').innerHT
 if (m.type === 'chat_clear') { document.getElementById('chatMessages').innerHTML = ''; addSystemMsg('🧹 Chat limpo pelo Admin'); }
 if (m.type === 'user_kicked') { addSystemMsg('👢 Admin removeu um usuário'); }
 if (m.type === 'user_banned') { addSystemMsg('🔨 Admin baniu um usuário'); }
-// Call signaling
 if (m.type === 'call_offer') handleCallOffer(m);
 if (m.type === 'call_answer') handleCallAnswer(m);
 if (m.type === 'call_ice') handleCallICE(m);
@@ -141,7 +140,7 @@ try { await api('/api/admin/chat', { method: 'DELETE' }); } catch(e) {}
 }
 
 // ============================================================
-// CALL (WebRTC)
+// CALL (WebRTC) - CORRIGIDO
 // ============================================================
 async function startCall(targetId) {
 if (inCall) { alert('Voce ja esta em uma chamada'); return; }
@@ -149,7 +148,24 @@ callUserId = targetId;
 inCall = true;
 
 try {
+// Tenta áudio primeiro (sempre funciona), vídeo opcional
+localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+// Tenta adicionar vídeo se disponível
+try {
+const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+videoStream.getVideoTracks().forEach(track => {
+localStream.addTrack(track);
+});
+videoStream.getVideoTracks().forEach(track => track.stop()); // limpa stream extra
+// Melhor: pega áudio+video de uma vez se possível
+localStream.getTracks().forEach(t => t.stop());
 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+} catch(e) {
+// Sem câmera, usa só áudio
+console.log('Sem camera, usando apenas audio');
+}
+
 document.getElementById('localVideo').srcObject = localStream;
 document.getElementById('callPanel').classList.remove('hidden');
 
@@ -168,10 +184,10 @@ document.getElementById('remoteVideo').srcObject = e.streams[0];
 
 const offer = await pc.createOffer();
 await pc.setLocalDescription(offer);
-sendWS({ type: 'call_offer', target: targetId, offer: offer });
+sendWS({ type: 'call_offer', target: targetId, offer: offer, fromName: user.global_name || user.username });
 
 } catch(e) {
-alert('Erro ao acessar camera/microfone: ' + e.message);
+alert('Erro: Verifique se seu microfone esta disponivel. ' + e.message);
 endCall(false);
 }
 }
@@ -186,7 +202,15 @@ callUserId = m.from;
 inCall = true;
 
 try {
+// Áudio primeiro
+localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+try {
+const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+videoStream.getVideoTracks().forEach(track => track.stop());
+localStream.getTracks().forEach(t => t.stop());
 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+} catch(e) {}
+
 document.getElementById('localVideo').srcObject = localStream;
 document.getElementById('callPanel').classList.remove('hidden');
 
