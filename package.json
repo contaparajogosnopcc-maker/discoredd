@@ -1,11 +1,10 @@
 {
-  "name": "discord-rich-presence-render",
-  "version": "1.0.0",
-  "description": "Discord Rich Presence Demo - Deploy no Render",
+  "name": "discord-admin-chat",
+  "version": "2.0.0",
+  "description": "Discord Admin Panel + Chat",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.21.0",
