@@ -1,0 +1,52 @@
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 100%);min-height:100vh;display:flex;justify-content:center;align-items:center;color:#e0e0e0;padding:20px}
+.container{width:100%;max-width:600px}
+header{text-align:center;margin-bottom:30px}
+.badge{background:linear-gradient(45deg,#3B82F6,#6366F1);color:#fff;padding:6px 16px;border-radius:20px;font-size:.85em;font-weight:600}
+h1{font-size:2.3em;background:linear-gradient(45deg,#5865F2,#7289DA);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:10px 0}
+.sub{color:#888;font-size:1.1em}
+.card{background:rgba(255,255,255,.05);backdrop-filter:blur(10px);border-radius:16px;border:1px solid rgba(255,255,255,.1);padding:30px;margin-bottom:20px}
+.hidden{display:none}
+#loginBox{text-align:center}
+.logo{font-size:80px;margin-bottom:20px;animation:float 3s infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+#loginBox h2{margin-bottom:15px;color:#fff;font-size:1.6em}
+#loginBox p{color:#999;margin-bottom:25px}
+.feats{display:flex;flex-direction:column;gap:10px;margin-bottom:25px;text-align:left;padding:0 20px}
+.feat{background:rgba(99,102,241,.1);padding:10px 15px;border-radius:8px;color:#ccc;font-size:.95em;border-left:3px solid #6366F1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:#5865F2;color:#fff;text-decoration:none;padding:14px 30px;border-radius:8px;font-size:1.1em;font-weight:600;border:none;cursor:pointer;transition:.3s}
+.btn:hover{background:#4752C4;transform:translateY(-2px);box-shadow:0 10px 20px rgba(88,101,242,.3)}
+.btn.full{width:100%}
+.btn-out{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.1);color:#ff6b6b;border:1px solid rgba(255,107,107,.3);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.9em;transition:.3s}
+.btn-out:hover{background:rgba(255,107,107,.2)}
+.user-row{display:flex;align-items:center;gap:15px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:25px}
+.avatar{width:60px;height:60px;border-radius:50%;border:3px solid #5865F2;object-fit:cover}
+.user-col{flex:1}.user-col strong{color:#fff;font-size:1.2em}
+.tag{background:#5865F2;color:#fff;padding:3px 10px;border-radius:12px;font-size:.8em}
+h3,h4{color:#fff;margin-bottom:15px;margin-top:20px}
+.preview{background:rgba(0,0,0,.3);border-radius:12px;padding:20px;border:1px solid rgba(88,101,242,.3);margin-bottom:25px}
+.prev-row{display:flex;align-items:center;gap:10px;margin-bottom:15px}
+.prev-avatar{width:40px;height:40px;border-radius:50%}
+.prev-sub{color:#888;font-size:.9em;display:block}
+.prev-title{font-size:1.1em;font-weight:600;color:#fff}
+.prev-state{color:#aaa;font-size:.9em}
+.prev-time{color:#5865F2;font-size:.85em}
+.field{margin-bottom:15px}
+.field label{display:block;color:#aaa;margin-bottom:5px;font-size:.9em}
+.field input{width:100%;padding:12px 15px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:1em;transition:.3s}
+.field input:focus{outline:none;border-color:#5865F2}
+.msg{padding:10px;border-radius:8px;text-align:center;margin-top:10px;font-size:.9em;display:none}
+.msg.show{display:block;background:rgba(87,242,135,.15);color:#57F287}
+.msg.err{background:rgba(255,107,107,.15);color:#ff6b6b}
+.online{display:flex;flex-direction:column;gap:10px;min-height:50px}
+.loading{color:#888;text-align:center;padding:15px}
+.online-card{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border-radius:8px;padding:12px 15px}
+.online-av{width:40px;height:40px;border-radius:50%}
+.online-info{flex:1}.online-name{font-weight:600;color:#fff}.online-det{font-size:.8em;color:#aaa}
+.online-dot{width:10px;height:10px;background:#57F287;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.count{text-align:center;color:#888;font-size:.85em;margin-top:10px}
+.status{text-align:center;padding:10px;background:rgba(255,255,255,.05);border-radius:8px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.85em}
+.dot{width:8px;height:8px;border-radius:50%;background:#57F287}
+@media(max-width:480px){h1{font-size:1.8em}.card{padding:20px 15px}}
+
