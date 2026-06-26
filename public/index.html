@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="pt-BR">
+<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -15,17 +16,22 @@
         <p>Conecte seu Discord para conversar</p>
         <a href="/login" class="btn-discord">Entrar com Discord</a>
       </div>
-    </div>    <!-- Main -->    <div id="mainScreen" class="screen hidden">
+    </div>
+
+    <!-- Main -->
+    <div id="mainScreen" class="screen hidden">
       <header class="app-header">
         <button id="menuToggle" class="icon-btn">☰</button>
         <h2>Nexus Chat</h2>
         <div class="header-actions">
           <button id="rankingBtn" class="icon-btn" title="Ranking">🏆</button>
-          <button id="themeBtn" class="icon-btn" title="Tema">🎨</button>
+          <button id="settingsBtn" class="icon-btn" title="Personalizar">🎨</button>
           <span id="onlineBadge" class="badge-sm">0 online</span>
           <button id="logoutBtn" class="icon-btn">🚪</button>
         </div>
-      </header>      <div class="app-body">
+      </header>
+
+      <div class="app-body">
         <aside id="sidebar" class="sidebar">
           <div class="sidebar-header">
             <img id="avatar" src="" class="avatar-lg">
@@ -33,15 +39,21 @@
               <strong id="username"></strong>
               <span id="xpBadge" class="xp-badge">Lv.1</span>
             </div>
-          </div>          <div id="adminPanel" class="admin-panel hidden">
+          </div>
+
+          <div id="adminPanel" class="admin-panel hidden">
             <h4>🛡️ Admin</h4>
             <button class="admin-btn" onclick="adminClearChat()">🧹 Limpar Chat</button>
             <button class="admin-btn" onclick="openRoleManager()">👥 Gerenciar Cargos</button>
             <button class="admin-btn" onclick="openReportsPanel()">🚩 Denúncias</button>
             <button class="admin-btn" onclick="openLogsPanel()">📋 Logs</button>
-          </div>          <h4>🟢 Online</h4>
+          </div>
+
+          <h4>🟢 Online</h4>
           <div id="onlineList" class="online-list"><div class="empty-text">Ninguém online</div></div>
-        </aside>        <main class="chat-area" id="chatArea">
+        </aside>
+
+        <main class="chat-area" id="chatArea">
           <div id="chatMessages" class="chat-messages">
             <div class="chat-empty"><div class="empty-icon">💬</div><p>Nenhuma mensagem</p></div>
           </div>
@@ -53,17 +65,25 @@
           </div>
         </main>
       </div>
-    </div>    <!-- Call Panel -->    <div id="callPanel" class="call-panel hidden">
+    </div>
+
+    <!-- Call Panel -->
+    <div id="callPanel" class="call-panel hidden">
       <div class="call-header"><span>📞 Em chamada</span><button id="hangupBtn" class="hangup-btn">❌</button></div>
       <div class="call-videos"><video id="localVideo" autoplay muted playsinline></video><video id="remoteVideo" autoplay playsinline></video></div>
-    </div>    <!-- Modals -->    <div id="modalOverlay" class="modal-overlay hidden"></div>
-    <div id="adminModal" class="modal-card hidden">...</div>
-    <div id="profileModal" class="modal-card hidden">...</div>
-    <div id="settingsModal" class="modal-card hidden">...</div>
-    <div id="roleManagerModal" class="modal-card hidden">...</div>
-    <div id="reportsModal" class="modal-card hidden">...</div>
-    <div id="logsModal" class="modal-card hidden">...</div>
-    <div id="rankingModal" class="modal-card hidden">...</div>    <div id="statusBar" class="status-bar"><span class="status-dot"></span> <span id="statusText">Conectando...</span></div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="modal-overlay hidden"></div>
+    <div id="adminModal" class="modal-card hidden"></div>
+    <div id="profileModal" class="modal-card hidden"></div>
+    <div id="settingsModal" class="modal-card hidden"></div>
+    <div id="roleManagerModal" class="modal-card hidden"></div>
+    <div id="reportsModal" class="modal-card hidden"></div>
+    <div id="logsModal" class="modal-card hidden"></div>
+    <div id="rankingModal" class="modal-card hidden"></div>
+
+    <div id="statusBar" class="status-bar"><span class="status-dot"></span> <span id="statusText">Conectando...</span></div>
   </div>
   <script src="app.js"></script>
 </body>
