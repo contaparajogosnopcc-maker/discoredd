@@ -10,7 +10,6 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const SITE_URL = process.env.SITE_URL || 'http://localhost:' + PORT;
 const REDIRECT_URI = SITE_URL + '/callback';
 const ADMIN_ID = '1112900049765154867';
-
 const sessions = new Map();
 const presences = new Map();
 const messages = [];
@@ -37,14 +36,14 @@ app.get('/login', (req, res) => {
 
 app.get('/callback', async (req, res) => {
   const { code } = req.query;
-  if (!code) return res.status(400).send(html('Erro', 'Codigo nao fornecido.'));
+  if (!code) return res.send(html('Erro', 'Codigo nao fornecido.'));
   try {
     const tr = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'},
       body: new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI })
     });
     const td = await tr.json();
-    if (!td.access_token) return res.status(400).send(html('Falha','Token invalido.'));
+    if (!td.access_token) return res.send(html('Falha','Token invalido.'));
     const ur = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: 'Bearer ' + td.access_token } });
     const ud = await ur.json();
     if (bannedUsers.has(ud.id)) return res.send(html('Banido','Voce foi banido.'));
@@ -55,7 +54,7 @@ app.get('/callback', async (req, res) => {
     });
     console.log('Login: ' + ud.username + (ud.id===ADMIN_ID?' (ADMIN)':''));
     res.redirect('/?token=' + st);
-  } catch(e) { res.status(500).send(html('Erro','Algo deu errado.')); }
+  } catch(e) { res.send(html('Erro','Algo deu errado.')); }
 });
 
 function auth(req) {
@@ -110,7 +109,6 @@ app.post('/api/messages', (req, res) => {
   res.json({ success: true, message: msg });
 });
 
-// ADMIN ROTAS
 app.delete('/api/admin/chat', (req, res) => {
   if (!admin(req)) return res.status(403).json({ error: 'Apenas admin' });
   messages.length = 0;
@@ -139,4 +137,53 @@ app.post('/api/admin/ban/:id', (req, res) => {
   for (let i=messages.length-1; i>=0; i--) { if (messages[i].userId===tid) messages.splice(i,1); }
   broadcast({ type:'presences', data: getPresences() });
   broadcast({ type:'user_banned', userId: tid });
-  res.json({
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/ban/:id', (req, res) => {
+  if (!admin(req)) return res.status(403).json({ error: 'Apenas admin' });
+  bannedUsers.delete(req.params.id);
+  res.json({ success: true });
+});
+
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+function broadcast(d) {
+  const m = JSON.stringify(d);
+  wss.clients.forEach(c => { if (c.readyState===WebSocket.OPEN) c.send(m); });
+}
+
+function getPresences() {
+  const l = [];
+  presences.forEach((d,uid) => l.push({
+    userId:uid, username:d.user.username, globalName:d.user.globalName,
+    avatar:d.user.avatar, presence:d.presence, lastUpdate:d.lastUpdate, isAdmin:d.user.isAdmin
+  }));
+  return l.sort((a,b)=>b.lastUpdate-a.lastUpdate);
+}
+
+wss.on('connection', ws => {
+  ws.send(JSON.stringify({ type:'presences', data: getPresences() }));
+  ws.send(JSON.stringify({ type:'chat_history', messages }));
+  ws.on('message', raw => {
+    try {
+      const data = JSON.parse(raw);
+      if (['call_offer','call_answer','call_ice','call_ended','call_declined'].includes(data.type)) {
+        wss.clients.forEach(c => {
+          if (c !== ws && c.readyState === WebSocket.OPEN) {
+            c.send(JSON.stringify({ ...data, from: data.from || 'unknown', fromName: data.fromName || 'Usuario' }));
+          }
+        });
+      }
+    } catch(e) {}
+  });
+});
+
+setInterval(() => wss.clients.forEach(c => { if (c.readyState===WebSocket.OPEN) c.ping(); }), 30000);
+
+function html(t,m) {
+  return '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+t+'</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:#1a1a2e;color:#e0e0e0;display:flex;justify-content:center;align-items:center;min-height:100vh;text-align:center}.box{background:rgba(255,255,255,.05);padding:40px;border-radius:16px;max-width:400px}h1{color:#5865F2;margin-bottom:15px}p{margin-bottom:20px}a{color:#5865F2;text-decoration:none;font-weight:600}</style></head><body><div class="box"><h1>'+t+'</h1><p>'+m+'</p><p><a href="/">Voltar</a></p></div></body></html>';
+}
+
+server.listen(PORT, () => console.log('Site rodando na porta ' + PORT));
