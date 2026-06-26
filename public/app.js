@@ -1,7 +1,3 @@
-// ============================================================
-// Nexus Chat - Aplicação completa
-// ============================================================
-
 let user = null;
 let token = null;
 let ws = null;
@@ -11,9 +7,19 @@ let peerConnections = new Map();
 let inCall = false;
 let callUserId = null;
 
-const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+// Servidores ICE: STUN + TURN (Cloudflare gratuito)
+const ICE = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    {
+      urls: 'turn:relay1.expressturn.com:3478',
+      username: 'efree',
+      credential: 'efree'
+    }
+  ]
+};
 
-// ==================== TOKEN ====================
 function getToken() {
   if (token) return token;
   const p = new URLSearchParams(location.search);
@@ -24,7 +30,6 @@ function getToken() {
   return null;
 }
 
-// ==================== API ====================
 async function api(path, opts = {}) {
   const t = getToken();
   const h = { ...opts.headers };
@@ -49,9 +54,9 @@ function connectWS() {
     if (m.type === 'presences') renderOnline(m.data);
     if (m.type === 'chat') addMessage(m.message);
     if (m.type === 'chat_history') { clearMessages(); m.messages.forEach(addMessage); }
-    if (m.type === 'chat_clear') { clearMessages(); addSystemMsg('🧹 Chat limpo pelo Admin'); }
-    if (m.type === 'user_kicked') { addSystemMsg('👢 Admin removeu um usuário'); }
-    if (m.type === 'user_banned') { addSystemMsg('🔨 Admin baniu um usuário'); }
+    if (m.type === 'chat_clear') { clearMessages(); addSystemMsg('Chat limpo pelo Admin'); }
+    if (m.type === 'user_kicked') { addSystemMsg('Admin removeu um usuário'); }
+    if (m.type === 'user_banned') { addSystemMsg('Admin baniu um usuário'); }
     if (m.type === 'call_offer') handleCallOffer(m);
     if (m.type === 'call_answer') handleCallAnswer(m);
     if (m.type === 'call_ice') handleCallICE(m);
@@ -98,7 +103,6 @@ function showMain() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('mainScreen').classList.remove('hidden');
 
-  // Avatar e nome
   const av = user.avatar
     ? 'https://cdn.discordapp.com/avatars/' + user.id + '/' + user.avatar + '.png?size=64'
     : 'https://cdn.discordapp.com/embed/avatars/0.png';
@@ -112,10 +116,8 @@ function showMain() {
     tag.style.display = 'none';
   }
 
-  // Admin panel
   if (user.isAdmin) document.getElementById('adminPanel').classList.remove('hidden');
 
-  // Eventos
   document.getElementById('sendBtn').onclick = sendMsg;
   document.getElementById('chatInput').onkeydown = e => { if (e.key === 'Enter') sendMsg(); };
   document.getElementById('logoutBtn').onclick = logout;
@@ -126,16 +128,13 @@ function showMain() {
   document.getElementById('modalCall').onclick = () => { closeModal(); startCall(selectedUserId); };
   document.getElementById('hangupBtn').onclick = () => endCall(true);
 
-  // Atualizar presença
   api('/api/presence', { method: 'POST', body: JSON.stringify({ details: 'No Nexus Chat', state: 'Conversando' }) }).catch(() => {});
 }
 
-// ==================== SIDEBAR MOBILE ====================
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
 }
 
-// Fechar sidebar ao clicar fora (mobile)
 document.addEventListener('click', function(e) {
   const sidebar = document.getElementById('sidebar');
   const toggle = document.getElementById('menuToggle');
@@ -157,13 +156,11 @@ async function sendMsg() {
 }
 
 function clearMessages() {
-  const c = document.getElementById('chatMessages');
-  c.innerHTML = '';
+  document.getElementById('chatMessages').innerHTML = '';
 }
 
 function addMessage(m) {
   const c = document.getElementById('chatMessages');
-  // Remove empty state
   const empty = c.querySelector('.chat-empty');
   if (empty) empty.remove();
 
@@ -208,13 +205,11 @@ function escapeHtml(t) {
 function renderOnline(list) {
   const c = document.getElementById('onlineList');
   const badge = document.getElementById('onlineBadge');
-
   if (!list || !list.length) {
     c.innerHTML = '<div class="empty-text">Ninguém online</div>';
     if (badge) badge.textContent = '0 online';
     return;
   }
-
   if (badge) badge.textContent = list.length + ' online';
 
   c.innerHTML = list.map(function(p) {
@@ -224,7 +219,6 @@ function renderOnline(list) {
     var isMe = user && user.id === p.userId;
     var isAdminTarget = user && user.isAdmin && !isMe;
     var clickHandler = isAdminTarget ? ' onclick="openAdminModal(\'' + p.userId + '\',\'' + (p.globalName || p.username).replace(/'/g, "\\'") + '\')"' : '';
-
     return '<div class="online-item' + (isAdminTarget ? ' admin-target' : '') + '"' + clickHandler + '>' +
       '<img src="' + av + '" class="online-av" loading="lazy">' +
       '<span class="online-name">' + escapeHtml(p.globalName || p.username) + (isMe ? ' (você)' : '') + (p.isAdmin ? ' <span class="admin-badge-sm">ADMIN</span>' : '') + '</span>' +
@@ -240,12 +234,10 @@ function openAdminModal(uid, uname) {
   document.getElementById('modalUsername').textContent = uname;
   document.getElementById('adminModal').classList.remove('hidden');
 }
-
 function closeModal() {
   document.getElementById('adminModal').classList.add('hidden');
   selectedUserId = null;
 }
-
 async function adminAction(action) {
   if (!selectedUserId) return;
   var ep = action === 'kick' ? '/api/admin/user/' + selectedUserId : '/api/admin/ban/' + selectedUserId;
@@ -253,55 +245,66 @@ async function adminAction(action) {
   try { await api(ep, { method: method }); } catch (e) {}
   closeModal();
 }
-
 async function adminClearChat() {
   if (!confirm('Limpar todas as mensagens?')) return;
   try { await api('/api/admin/chat', { method: 'DELETE' }); } catch (e) {}
 }
 
-// ==================== CALL ====================
+// ==================== CHAMADA ====================
 async function startCall(targetId) {
   if (inCall) { alert('Você já está em chamada'); return; }
   callUserId = targetId;
   inCall = true;
 
   try {
-    // Obter mídia local (áudio + vídeo, fallback para áudio)
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(() =>
       navigator.mediaDevices.getUserMedia({ audio: true, video: false })
     );
+    console.log('📹 Stream local obtido:', localStream.getTracks().map(t => t.kind));
 
     document.getElementById('localVideo').srcObject = localStream;
     document.getElementById('callPanel').classList.remove('hidden');
 
-    // Criar RTCPeerConnection
-    var pc = new RTCPeerConnection(ICE);
+    const pc = new RTCPeerConnection(ICE);
     peerConnections.set(targetId, pc);
 
-    localStream.getTracks().forEach(function(t) { pc.addTrack(t, localStream); });
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-    pc.onicecandidate = function(e) {
-      if (e.candidate) sendWS({ type: 'call_ice', target: targetId, candidate: e.candidate });
-    };
-
-    pc.ontrack = function(e) {
-      if (e.streams && e.streams[0]) {
-        document.getElementById('remoteVideo').srcObject = e.streams[0];
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        console.log('🧊 ICE candidate local:', e.candidate.type);
+        sendWS({ type: 'call_ice', target: targetId, candidate: e.candidate });
       }
     };
 
-    pc.oniceconnectionstatechange = function() {
+    pc.ontrack = (e) => {
+      console.log('📥 Track remoto recebido:', e.track.kind, 'streams:', e.streams.length);
+      if (e.streams && e.streams[0]) {
+        const remoteVideo = document.getElementById('remoteVideo');
+        remoteVideo.srcObject = e.streams[0];
+        // Forçar reprodução
+        remoteVideo.play().then(() => console.log('▶️ Vídeo remoto reproduzindo')).catch(err => console.warn('🔇 Autoplay bloqueado:', err));
+        // Log dos tracks
+        e.streams[0].getTracks().forEach(t => console.log('  - Track remoto:', t.kind, t.enabled));
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('🔗 ICE state:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
         endCall(false);
       }
     };
+    pc.onconnectionstatechange = () => console.log('📡 Connection state:', pc.connectionState);
+    pc.onsignalingstatechange = () => console.log('🚦 Signaling state:', pc.signalingState);
 
-    var offer = await pc.createOffer();
+    const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    console.log('📤 Offer criado e setado como local');
     sendWS({ type: 'call_offer', target: targetId, offer: offer });
 
   } catch (e) {
-    alert('Erro: Verifique as permissões do microfone/câmera.');
+    alert('Erro ao acessar câmera/microfone: ' + e.message);
     console.error(e);
     endCall(false);
   }
@@ -321,48 +324,63 @@ async function handleCallOffer(m) {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(() =>
       navigator.mediaDevices.getUserMedia({ audio: true, video: false })
     );
+    console.log('📹 Stream local obtido:', localStream.getTracks().map(t => t.kind));
 
     document.getElementById('localVideo').srcObject = localStream;
     document.getElementById('callPanel').classList.remove('hidden');
 
-    var pc = new RTCPeerConnection(ICE);
+    const pc = new RTCPeerConnection(ICE);
     peerConnections.set(m.from, pc);
 
-    localStream.getTracks().forEach(function(t) { pc.addTrack(t, localStream); });
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-    pc.onicecandidate = function(e) {
-      if (e.candidate) sendWS({ type: 'call_ice', target: m.from, candidate: e.candidate });
-    };
-
-    pc.ontrack = function(e) {
-      if (e.streams && e.streams[0]) {
-        document.getElementById('remoteVideo').srcObject = e.streams[0];
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        console.log('🧊 ICE candidate local:', e.candidate.type);
+        sendWS({ type: 'call_ice', target: m.from, candidate: e.candidate });
       }
     };
 
-    pc.oniceconnectionstatechange = function() {
+    pc.ontrack = (e) => {
+      console.log('📥 Track remoto recebido:', e.track.kind, 'streams:', e.streams.length);
+      if (e.streams && e.streams[0]) {
+        const remoteVideo = document.getElementById('remoteVideo');
+        remoteVideo.srcObject = e.streams[0];
+        remoteVideo.play().then(() => console.log('▶️ Vídeo remoto reproduzindo')).catch(err => console.warn('🔇 Autoplay bloqueado:', err));
+        e.streams[0].getTracks().forEach(t => console.log('  - Track remoto:', t.kind, t.enabled));
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('🔗 ICE state:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
         endCall(false);
       }
     };
+    pc.onconnectionstatechange = () => console.log('📡 Connection state:', pc.connectionState);
+    pc.onsignalingstatechange = () => console.log('🚦 Signaling state:', pc.signalingState);
 
     await pc.setRemoteDescription(new RTCSessionDescription(m.offer));
-    var answer = await pc.createAnswer();
+    console.log('📥 Offer remoto aplicado');
+    const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    console.log('📤 Answer criado e enviado');
     sendWS({ type: 'call_answer', target: m.from, answer: answer });
 
   } catch (e) {
-    alert('Erro na chamada.');
+    alert('Erro na chamada: ' + e.message);
     console.error(e);
     endCall(false);
   }
 }
 
 async function handleCallAnswer(m) {
-  var pc = peerConnections.get(m.from);
+  console.log('📥 Answer recebido');
+  const pc = peerConnections.get(m.from);
   if (pc) {
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(m.answer));
+      console.log('✅ Answer aplicado como descrição remota');
     } catch (e) {
       console.error('Erro ao aplicar answer:', e);
     }
@@ -370,10 +388,11 @@ async function handleCallAnswer(m) {
 }
 
 async function handleCallICE(m) {
-  var pc = peerConnections.get(m.from);
+  const pc = peerConnections.get(m.from);
   if (pc && m.candidate) {
     try {
       await pc.addIceCandidate(new RTCIceCandidate(m.candidate));
+      console.log('🧊 ICE candidate remoto adicionado');
     } catch (e) {
       console.error('Erro ICE:', e);
     }
@@ -382,23 +401,25 @@ async function handleCallICE(m) {
 
 function endCall(notify) {
   if (notify && callUserId) sendWS({ type: 'call_ended', target: callUserId });
-  peerConnections.forEach(function(pc) { pc.close(); });
+  peerConnections.forEach(pc => pc.close());
   peerConnections.clear();
   if (localStream) {
-    localStream.getTracks().forEach(function(t) { t.stop(); });
+    localStream.getTracks().forEach(t => t.stop());
     localStream = null;
   }
   document.getElementById('localVideo').srcObject = null;
-  document.getElementById('remoteVideo').srcObject = null;
+  const remoteVideo = document.getElementById('remoteVideo');
+  if (remoteVideo) remoteVideo.srcObject = null;
   document.getElementById('callPanel').classList.add('hidden');
   inCall = false;
   callUserId = null;
+  console.log('📴 Chamada encerrada');
 }
 
 // ==================== LOGOUT ====================
 async function logout() {
   endCall(true);
-  await api('/api/presence', { method: 'DELETE' }).catch(function() {});
+  await api('/api/presence', { method: 'DELETE' }).catch(() => {});
   if (ws) ws.close();
   localStorage.removeItem('dt');
   token = null;
