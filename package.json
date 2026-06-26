@@ -1,11 +1,8 @@
 {
-  "name": "discord-admin-chat",
-  "version": "2.0.0",
-  "description": "Discord Admin Panel + Chat",
+  "name": "discord-site",
+  "version": "4.0.0",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "scripts": { "start": "node server.js" },
   "dependencies": {
     "express": "^4.21.0",
     "ws": "^8.18.0",
