@@ -7,17 +7,23 @@ let peerConnections = new Map();
 let inCall = false;
 let callUserId = null;
 
-// Servidores ICE: STUN + TURN (Cloudflare gratuito)
+// Servidores ICE robustos: STUN Google + TURN Metered (gratuito e confiável)
 const ICE = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     {
-      urls: 'turn:relay1.expressturn.com:3478',
-      username: 'efree',
-      credential: 'efree'
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
     }
-  ]
+  ],
+  iceCandidatePoolSize: 2
 };
 
 function getToken() {
@@ -250,18 +256,25 @@ async function adminClearChat() {
   try { await api('/api/admin/chat', { method: 'DELETE' }); } catch (e) {}
 }
 
-// ==================== CHAMADA ====================
+// ==================== CHAMADA (CORRIGIDA) ====================
 async function startCall(targetId) {
   if (inCall) { alert('Você já está em chamada'); return; }
   callUserId = targetId;
   inCall = true;
 
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(() =>
-      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-    );
-    console.log('📹 Stream local obtido:', localStream.getTracks().map(t => t.kind));
+    // Solicitar áudio + vídeo com tratamento explícito
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      console.log('📹 Stream local obtido: áudio + vídeo');
+    } catch (e) {
+      console.warn('⚠️ Câmera não disponível, usando apenas áudio:', e.message);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      console.log('🎤 Stream local obtido: apenas áudio');
+    }
 
+    localStream = stream;
     document.getElementById('localVideo').srcObject = localStream;
     document.getElementById('callPanel').classList.remove('hidden');
 
@@ -272,39 +285,50 @@ async function startCall(targetId) {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        console.log('🧊 ICE candidate local:', e.candidate.type);
+        console.log('🧊 ICE candidate:', e.candidate.type, e.candidate.address || '');
         sendWS({ type: 'call_ice', target: targetId, candidate: e.candidate });
       }
     };
 
     pc.ontrack = (e) => {
-      console.log('📥 Track remoto recebido:', e.track.kind, 'streams:', e.streams.length);
+      console.log('📥 Track remoto recebido:', e.track.kind);
       if (e.streams && e.streams[0]) {
         const remoteVideo = document.getElementById('remoteVideo');
         remoteVideo.srcObject = e.streams[0];
-        // Forçar reprodução
-        remoteVideo.play().then(() => console.log('▶️ Vídeo remoto reproduzindo')).catch(err => console.warn('🔇 Autoplay bloqueado:', err));
-        // Log dos tracks
-        e.streams[0].getTracks().forEach(t => console.log('  - Track remoto:', t.kind, t.enabled));
+        remoteVideo.play().catch(err => console.warn('🔇 Autoplay:', err));
       }
     };
 
+    let disconnectTimer = null;
     pc.oniceconnectionstatechange = () => {
       console.log('🔗 ICE state:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+      if (pc.iceConnectionState === 'disconnected') {
+        // Aguardar 10 segundos antes de encerrar (pode reconectar)
+        if (!disconnectTimer) {
+          disconnectTimer = setTimeout(() => {
+            console.log('⏰ Tempo esgotado, encerrando chamada');
+            endCall(false);
+          }, 10000);
+        }
+      } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        if (disconnectTimer) {
+          clearTimeout(disconnectTimer);
+          disconnectTimer = null;
+        }
+      } else if (pc.iceConnectionState === 'failed') {
+        if (disconnectTimer) clearTimeout(disconnectTimer);
         endCall(false);
       }
     };
+
     pc.onconnectionstatechange = () => console.log('📡 Connection state:', pc.connectionState);
-    pc.onsignalingstatechange = () => console.log('🚦 Signaling state:', pc.signalingState);
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    console.log('📤 Offer criado e setado como local');
     sendWS({ type: 'call_offer', target: targetId, offer: offer });
 
   } catch (e) {
-    alert('Erro ao acessar câmera/microfone: ' + e.message);
+    alert('Erro ao acessar microfone: ' + e.message);
     console.error(e);
     endCall(false);
   }
@@ -321,11 +345,17 @@ async function handleCallOffer(m) {
   inCall = true;
 
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(() =>
-      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-    );
-    console.log('📹 Stream local obtido:', localStream.getTracks().map(t => t.kind));
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      console.log('📹 Stream local obtido: áudio + vídeo');
+    } catch (e) {
+      console.warn('⚠️ Câmera não disponível, usando apenas áudio:', e.message);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      console.log('🎤 Stream local obtido: apenas áudio');
+    }
 
+    localStream = stream;
     document.getElementById('localVideo').srcObject = localStream;
     document.getElementById('callPanel').classList.remove('hidden');
 
@@ -336,35 +366,41 @@ async function handleCallOffer(m) {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        console.log('🧊 ICE candidate local:', e.candidate.type);
+        console.log('🧊 ICE candidate:', e.candidate.type);
         sendWS({ type: 'call_ice', target: m.from, candidate: e.candidate });
       }
     };
 
     pc.ontrack = (e) => {
-      console.log('📥 Track remoto recebido:', e.track.kind, 'streams:', e.streams.length);
+      console.log('📥 Track remoto recebido:', e.track.kind);
       if (e.streams && e.streams[0]) {
         const remoteVideo = document.getElementById('remoteVideo');
         remoteVideo.srcObject = e.streams[0];
-        remoteVideo.play().then(() => console.log('▶️ Vídeo remoto reproduzindo')).catch(err => console.warn('🔇 Autoplay bloqueado:', err));
-        e.streams[0].getTracks().forEach(t => console.log('  - Track remoto:', t.kind, t.enabled));
+        remoteVideo.play().catch(err => console.warn('🔇 Autoplay:', err));
       }
     };
 
+    let disconnectTimer = null;
     pc.oniceconnectionstatechange = () => {
       console.log('🔗 ICE state:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+      if (pc.iceConnectionState === 'disconnected') {
+        disconnectTimer = setTimeout(() => {
+          console.log('⏰ Tempo esgotado, encerrando chamada');
+          endCall(false);
+        }, 10000);
+      } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null; }
+      } else if (pc.iceConnectionState === 'failed') {
+        if (disconnectTimer) clearTimeout(disconnectTimer);
         endCall(false);
       }
     };
+
     pc.onconnectionstatechange = () => console.log('📡 Connection state:', pc.connectionState);
-    pc.onsignalingstatechange = () => console.log('🚦 Signaling state:', pc.signalingState);
 
     await pc.setRemoteDescription(new RTCSessionDescription(m.offer));
-    console.log('📥 Offer remoto aplicado');
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    console.log('📤 Answer criado e enviado');
     sendWS({ type: 'call_answer', target: m.from, answer: answer });
 
   } catch (e) {
@@ -375,12 +411,11 @@ async function handleCallOffer(m) {
 }
 
 async function handleCallAnswer(m) {
-  console.log('📥 Answer recebido');
   const pc = peerConnections.get(m.from);
   if (pc) {
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(m.answer));
-      console.log('✅ Answer aplicado como descrição remota');
+      console.log('✅ Answer aplicado');
     } catch (e) {
       console.error('Erro ao aplicar answer:', e);
     }
@@ -392,7 +427,6 @@ async function handleCallICE(m) {
   if (pc && m.candidate) {
     try {
       await pc.addIceCandidate(new RTCIceCandidate(m.candidate));
-      console.log('🧊 ICE candidate remoto adicionado');
     } catch (e) {
       console.error('Erro ICE:', e);
     }
