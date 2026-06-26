@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Discord Chat - Admin</title>
+  <title>Discord Site</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <span class="badge">🛡️ Admin</span>
+      <span class="badge">🛡️ Admin Panel</span>
       <h1>💬 Discord Chat</h1>
-      <p class="sub">Bate-papo em tempo real • Comandos Admin</p>
+      <p class="sub">Bate-papo em tempo real • Chamadas • Admin</p>
     </header>
 
     <div id="loginBox" class="card">
       <div class="logo">🛡️</div>
       <h2>Conecte sua conta Discord</h2>
-      <p>Entre para conversar em <strong>tempo real</strong>!</p>
+      <p>Entre para conversar e fazer chamadas em <strong>tempo real</strong>!</p>
       <a href="/login" class="btn">Login com Discord</a>
     </div>
 
@@ -29,9 +29,9 @@
           <button id="logoutBtn" class="btn-out">🚪</button>
         </div>
         <div id="adminPanel" class="admin-panel hidden">
-          <h4>🛡️ Painel Admin</h4>
+          <h4>🛡️ Admin</h4>
           <button class="admin-btn danger" onclick="adminClearChat()">🧹 Limpar Chat</button>
-          <div class="admin-info">Clique em um usuário para gerenciar</div>
+          <p class="admin-info">Clique em um usuario para gerenciar</p>
         </div>
         <h4>🟢 Online</h4>
         <div id="onlineList" class="online-list"><div class="loading">Carregando...</div></div>
@@ -48,13 +48,27 @@
       </main>
     </div>
 
+    <!-- Painel de Chamada -->
+    <div id="callPanel" class="call-panel hidden">
+      <div class="call-header">
+        <span>📞 Em chamada</span>
+        <button id="hangupBtn" class="hangup-btn">❌ Desligar</button>
+      </div>
+      <div class="call-videos">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+    </div>
+
+    <!-- Modal Admin -->
     <div id="adminModal" class="modal hidden">
       <div class="modal-content">
-        <h3>🛡️ Gerenciar Usuário</h3>
+        <h3>🛡️ Gerenciar</h3>
         <p id="modalUsername"></p>
         <div class="modal-buttons">
           <button class="admin-btn warning" id="modalKick">👢 Kick</button>
           <button class="admin-btn danger" id="modalBan">🔨 Banir</button>
+          <button class="admin-btn call" id="modalCall">📞 Ligar</button>
           <button class="btn" id="modalClose">Cancelar</button>
         </div>
       </div>
