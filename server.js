@@ -10,11 +10,17 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const SITE_URL = process.env.SITE_URL || 'http://localhost:' + PORT;
 const REDIRECT_URI = SITE_URL + '/callback';
 const ADMIN_ID = '1112900049765154867';
-const sessions = new Map();
-const presences = new Map();
+
+const sessions = new Map();       // token -> user data
+const presences = new Map();      // userId -> presence
 const messages = [];
 const bannedUsers = new Set();
 const MAX_MSG = 200;
+
+// Mapeamento: WebSocket -> userId
+const wsToUser = new Map();
+// Mapeamento: userId -> WebSocket
+const userToWs = new Map();
 
 setInterval(() => {
   const now = Date.now();
@@ -163,20 +169,59 @@ function getPresences() {
   return l.sort((a,b)=>b.lastUpdate-a.lastUpdate);
 }
 
-wss.on('connection', ws => {
+// Enviar mensagem para um usuário específico
+function sendToUser(userId, data) {
+  const ws = userToWs.get(userId);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+}
+
+wss.on('connection', (ws, req) => {
+  // Extrair token da query string da URL
+  const urlParams = new URLSearchParams(req.url.split('?')[1] || '');
+  const token = urlParams.get('token');
+  
+  let userId = 'unknown';
+  
+  if (token && sessions.has(token)) {
+    const userData = sessions.get(token);
+    userId = userData.id;
+    wsToUser.set(ws, userId);
+    userToWs.set(userId, ws);
+    console.log('WS conectado: ' + userData.username + ' (' + userId + ')');
+  }
+
   ws.send(JSON.stringify({ type:'presences', data: getPresences() }));
   ws.send(JSON.stringify({ type:'chat_history', messages }));
+
   ws.on('message', raw => {
     try {
       const data = JSON.parse(raw);
+      
+      // Roteamento de chamadas - envia apenas para o usuário alvo
       if (['call_offer','call_answer','call_ice','call_ended','call_declined'].includes(data.type)) {
-        wss.clients.forEach(c => {
-          if (c !== ws && c.readyState === WebSocket.OPEN) {
-            c.send(JSON.stringify({ ...data, from: data.from || 'unknown', fromName: data.fromName || 'Usuario' }));
-          }
-        });
+        const targetWs = userToWs.get(data.target);
+        if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+          // Adiciona informações de quem enviou
+          const session = sessions.get(token);
+          targetWs.send(JSON.stringify({
+            ...data,
+            from: userId,
+            fromName: session ? (session.global_name || session.username) : 'Usuario'
+          }));
+        }
       }
     } catch(e) {}
+  });
+
+  ws.on('close', () => {
+    const uid = wsToUser.get(ws);
+    if (uid) {
+      userToWs.delete(uid);
+      wsToUser.delete(ws);
+      console.log('WS desconectado: ' + uid);
+    }
   });
 });
 
